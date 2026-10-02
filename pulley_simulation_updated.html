@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>도르래 힘·줄 길이 시뮬레이션</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,"Noto Sans KR",sans-serif;background:#f4f6f8;color:#202124}
+.wrap{max-width:1000px;margin:auto;padding:18px}h1{font-size:24px}
+.grid{display:grid;grid-template-columns:330px 1fr;gap:16px}
+.panel,.sim{background:#fff;border-radius:14px;padding:18px;box-shadow:0 2px 10px #0001}
+label{display:block;font-weight:700;margin:13px 0 6px}
+select,input[type=number]{width:100%;padding:10px;border:1px solid #ccd1d7;border-radius:8px;font-size:16px}
+input[type=range]{width:100%}button{width:100%;padding:13px;margin-top:13px;border:0;border-radius:9px;background:#1677ff;color:#fff;font-size:17px;font-weight:700}
+button.secondary{background:#6b7280}.stats{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}
+.stat{padding:11px;background:#f1f5f9;border-radius:8px}.stat small{display:block;color:#666}.stat strong{font-size:18px}
+canvas{width:100%;height:auto;border:1px solid #ddd;border-radius:10px;background:#fafafa}
+.note{margin-top:11px;padding:10px;background:#f8fafc;border-radius:8px;line-height:1.45}
+@media(max-width:760px){.grid{grid-template-columns:1fr}h1{font-size:21px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>도르래 힘·줄 길이 시뮬레이션</h1>
+<div class="grid">
+<div class="panel">
+<label>도르래 종류</label>
+<select id="type">
+<option value="1">고정도르래</option>
+<option value="2">움직도르래</option>
+<option value="2c">복합도르래 1:2</option>
+<option value="3">복합도르래 1:3</option>
+</select>
+<label>질량 (kg)</label><input id="mass" type="number" value="100" min="1">
+<label>중력가속도 (m/s²)</label><input id="g" type="number" value="9.8" min=".1" step=".1">
+<label>도르래 효율 <span id="ev">90%</span></label><input id="eff" type="range" min="50" max="100" value="90">
+<label>올릴 높이 (m)</label><input id="height" type="number" value="3" min=".5" step=".5">
+<button id="lift">끝까지 올리기</button>
+<button id="reset" class="secondary">처음 위치로</button>
+<div class="stats">
+<div class="stat"><small>기계적 이점</small><strong id="ma">1 : 1</strong></div>
+<div class="stat"><small>필요한 힘</small><strong id="force">980 N</strong></div>
+<div class="stat"><small>필요한 줄 길이</small><strong id="rope">3 m</strong></div>
+<div class="stat"><small>현재 올라간 높이</small><strong id="cur">0 m</strong></div>
+</div>
+<div class="note" id="desc"></div>
+</div>
+<div class="sim"><canvas id="cv" width="650" height="500"></canvas></div>
+</div>
+</div>
+<script>
+const $=id=>document.getElementById(id),cv=$("cv"),ctx=cv.getContext("2d");
+let p=0,target=0,running=false;
+function type(){return $("type").value}
+function MA(){return type()=="1"?1:2+(type()=="3")}
+function stats(){
+ let m=+$("mass").value||0,g=+$("g").value||9.8,e=+$("eff").value/100||.9,h=+$("height").value||0,n=MA();
+ $("ma").textContent="1 : "+n;
+ $("force").textContent=(m*g/n/e).toFixed(1)+" N";
+ $("rope").textContent=(h*n).toFixed(1)+" m";
+ $("cur").textContent=(h*p).toFixed(2)+" m";
+ $("ev").textContent=Math.round(e*100)+"%";
+ $("desc").textContent=type()=="1"?"고정도르래: 힘의 방향을 바꾸며 이상적인 기계적 이점은 1입니다.":
+ type()=="2"?"움직도르래: 이상적인 기계적 이점은 2입니다.":
+ type()=="2c"?"복합도르래 1:2: 이상적인 기계적 이점은 2입니다.":
+ "복합도르래 1:3: 이상적인 기계적 이점은 3입니다.";
+}
+function pulley(x,y,r){
+ ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fillStyle="#d8dee6";ctx.fill();ctx.strokeStyle="#4b5563";ctx.lineWidth=4;ctx.stroke();
+ ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);ctx.fillStyle="#374151";ctx.fill();
+}
+function rope(x1,y1,x2,y2){ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.strokeStyle="#8b5e34";ctx.lineWidth=5;ctx.stroke()}
+function load(x,y){
+ ctx.fillStyle="#2563eb";ctx.beginPath();ctx.roundRect(x-45,y,90,65,8);ctx.fill();
+ ctx.fillStyle="#fff";ctx.font="bold 18px Arial";ctx.textAlign="center";ctx.fillText("100 kg",x,y+39);
+}
+function draw(){
+ let W=cv.width,H=cv.height,y=390-(300*p);ctx.clearRect(0,0,W,H);
+ ctx.fillStyle="#374151";ctx.fillRect(70,45,W-140,14);
+ let t=type();
+ if(t=="1"){
+  pulley(325,120,38);rope(210,120,287,120);rope(363,120,470,120);rope(210,120,210,y);rope(470,120,470,250);load(210,y);
+ }else if(t=="2"){
+  pulley(325,y+35,38);rope(325,97,210,97);rope(210,97,210,y+35);rope(210,y+35,325,y+35);rope(325,y+35,440,y+35);rope(440,y+35,440,100);load(325,y+73);
+ }else if(t=="2c"){
+  pulley(325,y+35,38);pulley(325,120,30);rope(325,90,325,120);rope(295,120,190,120);rope(355,120,460,120);rope(190,120,190,y+35);rope(190,y+35,325,y+35);rope(325,y+35,460,y+35);rope(460,y+35,460,100);load(325,y+73);
+ }else{
+  pulley(325,y+35,38);pulley(325,120,30);pulley(445,175,28);
+  rope(325,90,325,120);rope(295,120,210,120);rope(355,120,445,120);rope(445,120,445,175);
+  rope(417,175,260,175);rope(473,175,520,175);rope(260,175,260,y+35);rope(260,y+35,325,y+35);rope(325,y+35,390,y+35);rope(390,y+35,390,90);load(325,y+73);
+ }
+ ctx.fillStyle="#111827";ctx.font="16px Arial";ctx.textAlign="center";
+ ctx.fillText(t=="1"?"고정도르래":t=="2"?"움직도르래":t=="2c"?"복합도르래 1:2":"복합도르래 1:3",325,25);
+ ctx.strokeStyle="#9ca3af";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(85,90);ctx.lineTo(85,390);ctx.stroke();
+ ctx.fillStyle="#4b5563";ctx.font="14px Arial";ctx.textAlign="left";ctx.fillText("최대 높이",92,95);ctx.fillText("시작 위치",92,395);
+}
+function animate(){
+ if(!running)return;
+ p+=(target-p)*.075;if(Math.abs(target-p)<.001){p=target;running=false}
+ stats();draw();if(running)requestAnimationFrame(animate);
+}
+$("lift").onclick=()=>{target=1;running=true;requestAnimationFrame(animate)}
+$("reset").onclick=()=>{running=false;p=target=0;stats();draw()}
+["type","mass","g","eff","height"].forEach(id=>$(id).addEventListener("input",()=>{stats();draw()}));
+stats();draw();
+</script>
+</body>
+</html>
